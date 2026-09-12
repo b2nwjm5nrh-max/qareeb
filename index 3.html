@@ -1,0 +1,2614 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#0f172a" />
+<meta name="description" content="قريب — اكتشف الأماكن المفتوحة حولك الآن" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="mobile-web-app-capable" content="yes" />
+<title>قريب — الأماكن حولك</title>
+
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='40' fill='%233b82f6'/%3E%3Ctext x='96' y='130' font-size='100' text-anchor='middle'%3E%F0%9F%97%BA%EF%B8%8F%3C/text%3E%3C/svg%3E">
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+
+<style>
+:root {
+  --bg-app: #0f172a;
+  --bg-surface: #1e293b;
+  --bg-surface-2: #334155;
+  --bg-elevated: #475569;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --border: rgba(255,255,255,.08);
+  --border-strong: rgba(255,255,255,.15);
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-soft: rgba(59,130,246,.15);
+  --success: #22c55e;
+  --danger: #ef4444;
+  --warning: #eab308;
+  --gmaps-blue: #4285f4;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --nav-height: 64px;
+}
+body.light-theme {
+  --bg-app: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-surface-2: #f1f5f9;
+  --bg-elevated: #e2e8f0;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --border: rgba(0,0,0,.08);
+  --border-strong: rgba(0,0,0,.15);
+  --accent-soft: rgba(59,130,246,.1);
+}
+body[data-accent="blue"] { --accent: #3b82f6; --accent-hover: #2563eb; --accent-soft: rgba(59,130,246,.15); }
+body[data-accent="green"] { --accent: #10b981; --accent-hover: #059669; --accent-soft: rgba(16,185,129,.15); }
+body[data-accent="purple"] { --accent: #8b5cf6; --accent-hover: #7c3aed; --accent-soft: rgba(139,92,246,.15); }
+body[data-accent="pink"] { --accent: #ec4899; --accent-hover: #db2777; --accent-soft: rgba(236,72,153,.15); }
+body[data-accent="orange"] { --accent: #f97316; --accent-hover: #ea580c; --accent-soft: rgba(249,115,22,.15); }
+body[data-accent="red"] { --accent: #ef4444; --accent-hover: #dc2626; --accent-soft: rgba(239,68,68,.15); }
+body[data-accent="teal"] { --accent: #14b8a6; --accent-hover: #0d9488; --accent-soft: rgba(20,184,166,.15); }
+body[data-accent="amber"] { --accent: #f59e0b; --accent-hover: #d97706; --accent-soft: rgba(245,158,11,.15); }
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  height: 100%; margin: 0; padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg-app); color: var(--text-primary);
+  overflow: hidden; width: 100%; overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+}
+button { cursor: pointer; -webkit-appearance: none; appearance: none; touch-action: manipulation; font-family: inherit; }
+input, textarea { font-family: inherit; }
+
+#splash {
+  position: fixed; inset: 0;
+  background: linear-gradient(135deg, #3b82f6, #1e40af);
+  z-index: 10000;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  color: #fff;
+  transition: opacity .4s, visibility .4s;
+}
+#splash.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+#splash .logo { font-size: 90px; margin-bottom: 20px; animation: splashPulse 1.5s ease-in-out infinite; }
+#splash .title { font-size: 32px; font-weight: 800; margin-bottom: 8px; }
+#splash .sub { font-size: 15px; opacity: .9; margin-bottom: 40px; }
+#splash .status { font-size: 13px; opacity: .8; margin-top: 16px; min-height: 20px; }
+#splash .loader {
+  width: 40px; height: 40px;
+  border: 4px solid rgba(255,255,255,.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes splashPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+#map { position: fixed; inset: 0; z-index: 1; background: var(--bg-app); }
+
+#mapLoading {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 90;
+  background: rgba(15,23,42,.95);
+  border-radius: 20px;
+  padding: 20px 28px;
+  display: none; flex-direction: column;
+  align-items: center; gap: 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.5);
+  border: 1px solid var(--border-strong);
+}
+#mapLoading.show { display: flex; }
+#mapLoading .loader {
+  width: 36px; height: 36px;
+  border: 3px solid rgba(255,255,255,.2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+#mapLoading .text { font-size: 14px; font-weight: 700; color: #fff; }
+
+#offlineBanner {
+  position: fixed; top: 0; left: 0; right: 0;
+  background: var(--danger); color: #fff;
+  padding: calc(var(--safe-top) + 8px) 16px 8px;
+  text-align: center; font-size: 13px; font-weight: 700;
+  z-index: 10000;
+  transform: translateY(-100%);
+  transition: transform .3s;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+#offlineBanner.show { transform: translateY(0); }
+#offlineBanner button {
+  background: rgba(255,255,255,.2); color: #fff;
+  border: none; padding: 4px 10px; border-radius: 6px;
+  font-size: 11px; font-weight: 700;
+}
+
+#errorOverlay {
+  position: fixed; inset: 0;
+  background: var(--bg-app);
+  z-index: 8000;
+  display: none; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 40px 24px; text-align: center;
+}
+#errorOverlay.show { display: flex; }
+#errorOverlay .icon { font-size: 80px; margin-bottom: 20px; }
+#errorOverlay .title { font-size: 22px; font-weight: 800; margin-bottom: 10px; }
+#errorOverlay .text { font-size: 14px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 24px; max-width: 340px; }
+#errorOverlay .btn {
+  background: var(--accent); color: #fff;
+  border: none; padding: 14px 24px; border-radius: 12px;
+  font-size: 15px; font-weight: 700;
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 10px; min-width: 200px; justify-content: center;
+}
+#errorOverlay .btn.secondary { background: var(--bg-surface-2); color: var(--text-primary); }
+
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0;
+  z-index: 100;
+  padding: calc(var(--safe-top) + 8px) 12px 8px;
+  background: linear-gradient(to bottom, rgba(15,23,42,.95) 0%, rgba(15,23,42,.85) 70%, transparent 100%);
+  display: flex; gap: 8px; align-items: center;
+  pointer-events: none;
+}
+body.light-theme .topbar {
+  background: linear-gradient(to bottom, rgba(248,250,252,.95) 0%, rgba(248,250,252,.85) 70%, transparent 100%);
+}
+.topbar > * { pointer-events: auto; }
+
+.search-pill {
+  flex: 1;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 12px 16px;
+  display: flex; align-items: center; gap: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.25);
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 15px;
+  min-height: 48px;
+}
+.search-pill .placeholder { flex: 1; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.btn-round {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.25);
+  flex-shrink: 0; padding: 0;
+}
+
+.avatar-btn {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--border-strong);
+  color: #fff;
+  font-size: 18px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0; flex-shrink: 0;
+  box-shadow: 0 4px 16px rgba(0,0,0,.25);
+}
+
+.last-update {
+  position: fixed;
+  top: calc(var(--safe-top) + 68px);
+  left: 12px;
+  z-index: 99;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 5px 12px;
+  font-size: 11px; font-weight: 600;
+  color: var(--text-secondary);
+  box-shadow: 0 2px 8px rgba(0,0,0,.2);
+  display: none; align-items: center; gap: 6px;
+  pointer-events: none;
+}
+.last-update.show { display: flex; }
+.last-update .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+
+.map-fab {
+  position: fixed; z-index: 50;
+  display: flex; flex-direction: column; gap: 8px;
+  right: 12px;
+  bottom: calc(var(--nav-height) + var(--safe-bottom) + 180px);
+}
+.map-fab button {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 18px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.25);
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+}
+.map-fab button.active { background: var(--accent); color: #fff; }
+
+#qiblaCompass {
+  position: fixed;
+  bottom: calc(var(--nav-height) + var(--safe-bottom) + 240px);
+  right: 12px;
+  width: 60px; height: 60px;
+  z-index: 55;
+  background: var(--bg-surface);
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  box-shadow: 0 4px 16px rgba(0,0,0,.3);
+  display: none; align-items: center; justify-content: center;
+  overflow: hidden; cursor: pointer;
+}
+#qiblaCompass.show { display: flex; }
+#qiblaCompass .arrow { font-size: 32px; transition: transform .1s linear; }
+#qiblaCompass .label {
+  position: absolute; bottom: 2px;
+  font-size: 8px; font-weight: 800;
+  color: var(--text-muted);
+}
+
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  z-index: 200;
+  background: var(--bg-surface);
+  border-top-left-radius: 20px; border-top-right-radius: 20px;
+  box-shadow: 0 -8px 32px rgba(0,0,0,.4);
+  display: flex; flex-direction: column;
+  transition: transform .35s cubic-bezier(.32,.72,0,1);
+  max-height: 88vh;
+  transform: translateY(calc(100% - 68px - var(--safe-bottom)));
+  will-change: transform;
+}
+.sheet.peek { transform: translateY(calc(100% - 68px - var(--safe-bottom))); }
+.sheet.half { transform: translateY(calc(100% - 50vh - var(--safe-bottom))); }
+.sheet.full { transform: translateY(calc(var(--safe-top) + 8px)); }
+.sheet.dragging { transition: none; }
+
+.sheet-handle {
+  padding: 10px 0 6px;
+  display: flex; justify-content: center;
+  flex-shrink: 0; touch-action: none; cursor: grab;
+}
+.sheet-handle::before {
+  content: ''; width: 40px; height: 4px;
+  background: var(--bg-elevated); border-radius: 2px;
+  transition: background .2s;
+}
+
+.sheet-header {
+  padding: 0 16px 12px;
+  display: flex; align-items: center; gap: 10px;
+  flex-shrink: 0;
+}
+.sheet-title { flex: 1; font-size: 17px; font-weight: 800; }
+.sheet-subtitle { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+.sheet-tabs {
+  display: flex; gap: 4px;
+  padding: 0 12px 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0; overflow-x: auto; scrollbar-width: none;
+}
+.sheet-tabs::-webkit-scrollbar { display: none; }
+.sheet-tab {
+  padding: 8px 14px; border-radius: 100px;
+  font-size: 13px; font-weight: 600;
+  color: var(--text-secondary);
+  background: transparent; border: none;
+  white-space: nowrap; transition: all .15s;
+}
+.sheet-tab.active { background: var(--accent-soft); color: var(--accent); }
+
+.sheet-body {
+  flex: 1;
+  overflow-y: auto; overflow-x: hidden;
+  padding: 12px 16px calc(var(--nav-height) + var(--safe-bottom) + 16px);
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.search-input-wrap { display: flex; gap: 8px; margin-bottom: 12px; }
+.search-input {
+  flex: 1;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 12px 16px; border-radius: 12px;
+  font-size: 15px; outline: none;
+}
+.search-input::placeholder { color: var(--text-muted); }
+
+.search-history {
+  display: flex; gap: 6px;
+  overflow-x: auto; padding: 6px 0 10px;
+  scrollbar-width: none;
+}
+.search-history::-webkit-scrollbar { display: none; }
+.search-history:empty { display: none; }
+.history-item {
+  padding: 6px 12px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  font-size: 12px;
+  color: var(--text-primary);
+  white-space: nowrap; cursor: pointer;
+  display: flex; align-items: center; gap: 5px;
+  flex-shrink: 0;
+}
+.history-item .close { font-size: 14px; opacity: .6; }
+
+.distance-filter {
+  background: var(--bg-surface-2);
+  border-radius: 12px;
+  padding: 10px 14px; margin-bottom: 12px;
+}
+.distance-filter .label {
+  font-size: 12px; color: var(--text-secondary);
+  font-weight: 600; margin-bottom: 6px;
+  display: flex; justify-content: space-between;
+}
+.distance-filter .label .value { color: var(--accent); font-weight: 800; }
+.distance-filter input[type="range"] {
+  width: 100%; -webkit-appearance: none; appearance: none;
+  height: 4px; background: var(--bg-elevated);
+  border-radius: 2px; outline: none;
+}
+.distance-filter input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 20px; height: 20px;
+  background: var(--accent); border-radius: 50%;
+  cursor: pointer; border: 3px solid var(--bg-surface);
+}
+
+.chips {
+  display: flex; gap: 6px;
+  overflow-x: auto; padding: 2px 0 10px;
+  scrollbar-width: none;
+}
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+  padding: 8px 14px; border-radius: 100px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 13px; font-weight: 600;
+  white-space: nowrap; flex-shrink: 0;
+  display: flex; align-items: center; gap: 5px;
+}
+.chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.stats-bar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.stat-pill {
+  flex: 1; min-width: 90px;
+  padding: 10px 12px;
+  background: var(--bg-surface-2);
+  border-radius: 12px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.stat-pill .num { font-size: 20px; font-weight: 800; }
+.stat-pill .lbl { font-size: 11px; color: var(--text-secondary); font-weight: 600; }
+.stat-pill.open-p .num { color: var(--success); }
+.stat-pill.closed-p .num { color: var(--danger); }
+.stat-pill.unknown-p .num { color: var(--text-muted); }
+
+.item {
+  padding: 12px;
+  background: var(--bg-surface-2);
+  border-radius: 14px;
+  margin-bottom: 8px;
+  display: flex; gap: 10px;
+  align-items: flex-start;
+  cursor: pointer;
+  transition: transform .12s;
+  position: relative;
+}
+.item:active { transform: scale(.98); }
+.item-thumb {
+  width: 52px; height: 52px;
+  border-radius: 10px;
+  background: var(--bg-surface);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px; flex-shrink: 0;
+  overflow: hidden; position: relative;
+}
+.item-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.item-thumb .photo-badge {
+  position: absolute; bottom: 2px; right: 2px;
+  background: rgba(0,0,0,.7); color: #fff;
+  font-size: 9px; padding: 1px 4px;
+  border-radius: 4px; font-weight: 700;
+}
+.item-thumb .visited-badge {
+  position: absolute; top: 2px; left: 2px;
+  background: var(--success); color: #fff;
+  font-size: 10px; padding: 1px 4px;
+  border-radius: 4px; font-weight: 700;
+}
+.item-info { flex: 1; min-width: 0; }
+.item-name {
+  font-weight: 700; font-size: 15px;
+  margin-bottom: 3px;
+  overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.item-meta {
+  display: flex; gap: 8px;
+  font-size: 12px; color: var(--text-secondary);
+  flex-wrap: wrap; align-items: center;
+}
+.item-status {
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 100px;
+  font-size: 11px; font-weight: 800;
+  flex-shrink: 0; height: fit-content;
+  white-space: nowrap;
+}
+.item-status.open { background: rgba(34,197,94,.15); color: var(--success); }
+.item-status.closed { background: rgba(239,68,68,.15); color: var(--danger); }
+.item-status.unknown { background: rgba(148,163,184,.15); color: var(--text-muted); }
+.item-fav {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: transparent; border: none;
+  color: var(--text-muted); font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; padding: 0;
+}
+.item-fav.active { color: #fbbf24; }
+
+.empty-state { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
+.empty-state .icon { font-size: 48px; margin-bottom: 12px; opacity: .5; }
+.empty-state .title { font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; }
+.empty-state .sub { font-size: 13px; line-height: 1.6; }
+
+.bottom-nav {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  z-index: 500;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border);
+  display: flex;
+  padding-bottom: var(--safe-bottom);
+  box-shadow: 0 -4px 24px rgba(0,0,0,.15);
+  height: calc(var(--nav-height) + var(--safe-bottom));
+}
+.nav-btn {
+  flex: 1; background: transparent; border: none;
+  color: var(--text-muted);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 3px;
+  font-size: 10px; font-weight: 600;
+  position: relative; padding: 6px 4px;
+}
+.nav-btn .icon { font-size: 22px; line-height: 1; transition: transform .2s; }
+.nav-btn.active { color: var(--accent); }
+.nav-btn.active .icon { transform: scale(1.1); }
+.nav-btn .nav-badge {
+  position: absolute; top: 4px; right: 50%;
+  transform: translateX(calc(50% + 8px));
+  background: var(--danger); color: #fff;
+  padding: 1px 6px; border-radius: 100px;
+  font-size: 9px; font-weight: 800;
+  min-width: 16px; text-align: center;
+}
+.nav-btn .nav-badge.hidden { display: none; }
+
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.7);
+  z-index: 2500;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  opacity: 0; pointer-events: none;
+  transition: opacity .2s;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.modal-overlay.show { opacity: 1; pointer-events: auto; }
+.modal {
+  background: var(--bg-surface);
+  border-radius: 20px; padding: 24px;
+  width: 100%; max-width: 380px;
+  max-height: 90vh; overflow-y: auto;
+  position: relative;
+}
+.modal-title { font-size: 22px; font-weight: 800; margin-bottom: 6px; text-align: center; }
+.modal-sub { font-size: 13px; color: var(--text-secondary); text-align: center; margin-bottom: 20px; }
+.modal-close {
+  position: absolute; top: 12px; right: 12px;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--bg-surface-2);
+  border: none; color: var(--text-primary);
+  font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+}
+
+.color-picker { display: flex; gap: 10px; padding: 12px 0; flex-wrap: wrap; justify-content: center; }
+.color-dot {
+  width: 42px; height: 42px; border-radius: 50%;
+  cursor: pointer; border: 3px solid transparent;
+  position: relative; display: flex;
+  align-items: center; justify-content: center;
+}
+.color-dot.active { border-color: var(--text-primary); }
+.color-dot.active::after {
+  content: '✓'; color: #fff;
+  font-weight: 800; font-size: 18px;
+  text-shadow: 0 1px 3px rgba(0,0,0,.5);
+}
+.color-dot[data-color="blue"] { background: #3b82f6; }
+.color-dot[data-color="green"] { background: #10b981; }
+.color-dot[data-color="purple"] { background: #8b5cf6; }
+.color-dot[data-color="pink"] { background: #ec4899; }
+.color-dot[data-color="orange"] { background: #f97316; }
+.color-dot[data-color="red"] { background: #ef4444; }
+.color-dot[data-color="teal"] { background: #14b8a6; }
+.color-dot[data-color="amber"] { background: #f59e0b; }
+
+.privacy-notice {
+  position: fixed;
+  bottom: calc(var(--nav-height) + var(--safe-bottom) + 12px);
+  left: 12px; right: 12px;
+  background: var(--bg-surface);
+  border-radius: 14px; padding: 14px;
+  z-index: 700;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  border: 1px solid var(--border);
+  display: none; gap: 12px; align-items: flex-start;
+}
+.privacy-notice.show { display: flex; }
+.privacy-notice .icon { font-size: 24px; flex-shrink: 0; }
+.privacy-notice .text { flex: 1; font-size: 12px; color: var(--text-secondary); line-height: 1.6; }
+.privacy-notice .text b { color: var(--text-primary); }
+.privacy-notice .btn {
+  background: var(--accent); color: #fff;
+  border: none; padding: 8px 14px;
+  border-radius: 8px; font-size: 12px;
+  font-weight: 700; flex-shrink: 0;
+}
+
+.detail-sheet-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 2000; opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s;
+}
+.detail-sheet-overlay.show { opacity: 1; pointer-events: auto; }
+.detail-sheet {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  background: var(--bg-surface);
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  z-index: 2100;
+  transform: translateY(100%);
+  transition: transform .3s cubic-bezier(.32,.72,0,1);
+  max-height: 92vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 -12px 40px rgba(0,0,0,.5);
+}
+.detail-sheet.show { transform: translateY(0); }
+.detail-sheet-handle {
+  width: 40px; height: 4px;
+  background: var(--bg-elevated);
+  border-radius: 2px;
+  margin: 12px auto 0; flex-shrink: 0;
+}
+.detail-sheet-header {
+  padding: 16px 20px 12px;
+  display: flex; align-items: flex-start;
+  gap: 14px; flex-shrink: 0;
+}
+.detail-sheet-emoji { font-size: 40px; line-height: 1; }
+.detail-sheet-titles { flex: 1; min-width: 0; }
+.detail-sheet-title {
+  font-size: 18px; font-weight: 800;
+  margin-bottom: 4px; word-break: break-word;
+}
+.detail-sheet-sub {
+  font-size: 13px; color: var(--text-secondary);
+  display: flex; gap: 8px;
+  align-items: center; flex-wrap: wrap;
+}
+.detail-sheet-close {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--bg-surface-2);
+  border: none; color: var(--text-primary);
+  font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0; flex-shrink: 0;
+}
+.detail-sheet-body {
+  flex: 1; overflow-y: auto;
+  padding: 8px 20px 20px;
+}
+.detail-row {
+  padding: 12px 0;
+  display: flex; gap: 12px;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--border);
+}
+.detail-row:last-child { border-bottom: none; }
+.detail-row .dr-icon { font-size: 18px; flex-shrink: 0; width: 24px; text-align: center; }
+.detail-row .dr-content { flex: 1; min-width: 0; }
+.detail-row .dr-label {
+  font-size: 11px; color: var(--text-muted);
+  font-weight: 700; margin-bottom: 3px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.detail-row .dr-copy {
+  background: transparent; border: none;
+  color: var(--accent); font-size: 11px;
+  padding: 2px 6px; font-weight: 700;
+}
+.detail-row .dr-value { font-size: 14px; word-break: break-word; line-height: 1.5; }
+.detail-row a.dr-value { color: var(--accent); text-decoration: none; }
+
+.detail-actions {
+  padding: 12px 20px calc(20px + var(--safe-bottom));
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 8px; flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  background: var(--bg-surface);
+}
+.detail-action {
+  padding: 12px 6px; border-radius: 14px;
+  background: var(--bg-surface-2);
+  color: var(--text-primary);
+  border: none; font-size: 11px; font-weight: 700;
+  display: flex; flex-direction: column;
+  align-items: center; gap: 4px;
+  text-decoration: none;
+  transition: transform .12s;
+}
+.detail-action:active { transform: scale(.95); }
+.detail-action .icon { font-size: 20px; }
+.detail-action.gmaps-btn { background: var(--gmaps-blue); color: #fff; }
+.detail-action.route-btn { background: var(--success); color: #052e16; }
+.detail-action.fav-action.active { background: #fbbf24; color: #3b2c00; }
+.detail-action.visited-action.active { background: #10b981; color: #fff; }
+
+.detail-tabs {
+  display: flex; gap: 4px;
+  padding: 8px 20px 0;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0; overflow-x: auto;
+  scrollbar-width: none;
+}
+.detail-tabs::-webkit-scrollbar { display: none; }
+.detail-tab {
+  padding: 10px 14px; font-size: 13px;
+  font-weight: 700; color: var(--text-secondary);
+  background: transparent; border: none;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+.detail-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.detail-tab-content { display: none; }
+.detail-tab-content.active { display: block; }
+
+.rating-summary {
+  display: flex; align-items: center;
+  gap: 16px; padding: 16px;
+  background: var(--bg-surface-2);
+  border-radius: 14px; margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.rating-big {
+  font-size: 44px; font-weight: 800;
+  line-height: 1; color: var(--warning);
+}
+.rating-stars-big { font-size: 18px; color: #fbbf24; margin-bottom: 4px; }
+.rating-count { font-size: 12px; color: var(--text-secondary); }
+
+.rating-input {
+  display: flex; gap: 8px;
+  justify-content: center;
+  margin: 12px 0; direction: ltr;
+}
+.star-btn {
+  font-size: 36px; background: transparent;
+  border: none; padding: 0;
+  color: var(--text-muted);
+  transition: transform .15s;
+}
+.star-btn.active { color: #fbbf24; transform: scale(1.1); }
+.star-btn:active { transform: scale(.85); }
+
+.review-textarea {
+  width: 100%; padding: 14px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: 12px; font-size: 14px;
+  outline: none; resize: vertical;
+  min-height: 80px;
+}
+.review-card {
+  padding: 14px; background: var(--bg-surface-2);
+  border-radius: 14px; margin-bottom: 10px;
+}
+.review-header {
+  display: flex; gap: 10px;
+  align-items: flex-start; margin-bottom: 8px;
+}
+.review-avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 16px; flex-shrink: 0;
+}
+.review-info { flex: 1; min-width: 0; }
+.review-name { font-weight: 700; font-size: 14px; margin-bottom: 2px; }
+.review-date { font-size: 11px; color: var(--text-muted); }
+.review-stars { display: flex; gap: 2px; margin-bottom: 6px; }
+.review-stars span { color: #fbbf24; font-size: 14px; }
+.review-text { font-size: 13px; line-height: 1.6; color: var(--text-secondary); }
+.review-delete {
+  background: transparent; border: none;
+  color: var(--danger); font-size: 12px;
+  padding: 4px 8px; font-weight: 600;
+}
+
+.custom-marker-wrapper { position: relative; width: 40px; height: 46px; }
+.custom-marker-bubble {
+  position: absolute; top: 0; left: 0;
+  width: 40px; height: 40px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  border: 2.5px solid #fff;
+  box-shadow: 0 3px 10px rgba(0,0,0,.4);
+  display: flex; align-items: center; justify-content: center;
+}
+.custom-marker-bubble-inner { transform: rotate(45deg); font-size: 18px; }
+.custom-marker-status {
+  position: absolute;
+  bottom: -3px; right: -6px;
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 2.5px solid #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 900; color: #fff;
+}
+.custom-marker-status.open-status { background: var(--success); }
+.custom-marker-status.closed-status { background: var(--danger); }
+.custom-marker-status.unknown-status { background: #94a3b8; }
+
+.marker-cluster-small { background-color: rgba(34,197,94,.4); }
+.marker-cluster-small div { background-color: rgba(34,197,94,.9); color:#052e16; font-weight:800; }
+.marker-cluster-medium { background-color: rgba(234,179,8,.4); }
+.marker-cluster-medium div { background-color: rgba(234,179,8,.9); color:#3b2c00; font-weight:800; }
+.marker-cluster-large { background-color: rgba(239,68,68,.4); }
+.marker-cluster-large div { background-color: rgba(239,68,68,.9); color:#fff; font-weight:800; }
+
+.leaflet-control-zoom { display: none !important; }
+.leaflet-control-attribution {
+  font-size: 9px !important;
+  background: rgba(0,0,0,.5) !important;
+  color: #fff !important;
+  padding: 2px 6px !important;
+}
+
+.toast {
+  position: fixed;
+  bottom: calc(var(--nav-height) + var(--safe-bottom) + 16px);
+  left: 50%;
+  transform: translate(-50%, 100px);
+  background: rgba(30,41,59,.98);
+  color: #fff;
+  padding: 12px 20px; border-radius: 14px;
+  font-size: 14px; font-weight: 600;
+  z-index: 3000;
+  opacity: 0;
+  transition: all .3s cubic-bezier(.32,.72,0,1);
+  pointer-events: none;
+  max-width: calc(100vw - 32px);
+  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  text-align: center;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+.profile-header {
+  padding: 24px 20px; text-align: center;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  color: #fff;
+}
+.profile-avatar {
+  width: 88px; height: 88px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.2);
+  margin: 0 auto 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 40px; font-weight: 800;
+  border: 4px solid rgba(255,255,255,.3);
+}
+.profile-name { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+.profile-email { font-size: 13px; opacity: .9; }
+.profile-stats {
+  display: flex; padding: 16px; gap: 12px;
+  background: var(--bg-surface);
+  border-radius: 14px;
+  margin: -20px 16px 12px;
+  position: relative; z-index: 2;
+  box-shadow: 0 4px 12px rgba(0,0,0,.15);
+}
+.profile-stat { flex: 1; text-align: center; }
+.profile-stat .num { font-size: 22px; font-weight: 800; color: var(--accent); }
+.profile-stat .lbl { font-size: 11px; color: var(--text-secondary); font-weight: 600; }
+
+.menu-sheet {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  background: var(--bg-surface);
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  padding: 20px 16px calc(20px + var(--safe-bottom));
+  z-index: 1600;
+  transform: translateY(100%);
+  transition: transform .3s cubic-bezier(.32,.72,0,1);
+  max-height: 85vh; overflow-y: auto;
+  box-shadow: 0 -12px 40px rgba(0,0,0,.4);
+}
+.menu-sheet.show { transform: translateY(0); }
+.menu-sheet-handle {
+  width: 40px; height: 4px;
+  background: var(--bg-elevated);
+  border-radius: 2px;
+  margin: 0 auto 16px;
+}
+.menu-sheet-title { font-size: 18px; font-weight: 800; margin-bottom: 4px; padding: 0 4px; }
+.menu-sheet-sub { font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; padding: 0 4px; }
+.menu-section-title {
+  font-size: 11px; color: var(--text-muted);
+  font-weight: 800; padding: 12px 4px 6px;
+}
+.menu-btn {
+  display: flex; align-items: center;
+  gap: 14px; width: 100%;
+  padding: 14px 12px;
+  background: transparent; border: none;
+  color: var(--text-primary);
+  text-align: start;
+  border-radius: 12px;
+  font-size: 15px; font-weight: 600;
+  transition: background .15s;
+}
+.menu-btn:active { background: var(--bg-surface-2); }
+.menu-btn .icon { font-size: 22px; width: 28px; text-align: center; flex-shrink: 0; }
+.menu-btn .label { flex: 1; }
+
+.menu-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 1500; opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s;
+}
+.menu-overlay.show { opacity: 1; pointer-events: auto; }
+
+.qibla-compass-big {
+  width: 200px; height: 200px;
+  margin: 20px auto;
+  position: relative;
+  border-radius: 50%;
+  background: var(--bg-surface-2);
+  border: 4px solid var(--border-strong);
+  display: flex; align-items: center; justify-content: center;
+}
+.qibla-arrow-big { font-size: 80px; transition: transform .2s linear; }
+.qibla-degrees {
+  font-size: 24px; font-weight: 800;
+  color: var(--accent); margin: 10px 0; text-align: center;
+}
+
+.modal-btn {
+  width: 100%; padding: 14px;
+  background: var(--accent); color: #fff;
+  border: none; border-radius: 12px;
+  font-size: 15px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  transition: transform .12s;
+}
+.modal-btn:active { transform: scale(.98); }
+
+.hidden { display: none !important; }
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 2px; }
+</style>
+</head>
+
+<body data-accent="blue">
+
+<!-- SPLASH -->
+<div id="splash">
+  <div class="logo">🗺️</div>
+  <div class="title">قريب</div>
+  <div class="sub">الأماكن حولك — مفتوحة الآن</div>
+  <div class="loader"></div>
+  <div class="status" id="splashStatus">جارٍ التحميل...</div>
+</div>
+
+<!-- OFFLINE -->
+<div id="offlineBanner">
+  <span>📴 لا يوجد اتصال بالإنترنت</span>
+  <button id="offlineRetry">إعادة المحاولة</button>
+</div>
+
+<!-- MAP -->
+<div id="map"></div>
+
+<!-- MAP LOADING -->
+<div id="mapLoading">
+  <div class="loader"></div>
+  <div class="text" id="mapLoadingText">جارٍ التحميل...</div>
+</div>
+
+<!-- ERROR -->
+<div id="errorOverlay">
+  <div class="icon">📍</div>
+  <div class="title">تعذر تحديد موقعك</div>
+  <div class="text">تأكد من تفعيل GPS أو اختر موقعك يدويًا من الخريطة.</div>
+  <button class="btn" id="errorRetry"><span>🔄</span><span>إعادة المحاولة</span></button>
+  <button class="btn secondary" id="errorManual"><span>🎯</span><span>اختر موقعًا افتراضيًا</span></button>
+</div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="search-pill" id="searchPill">
+    <span class="icon">🔍</span>
+    <span class="placeholder" id="searchPlaceholder">ابحث عن مدينة أو مكان...</span>
+  </div>
+  <button class="avatar-btn" id="btnProfile">👤</button>
+</div>
+
+<!-- LAST UPDATE -->
+<div class="last-update" id="lastUpdate">
+  <span class="dot"></span>
+  <span id="lastUpdateText">—</span>
+</div>
+
+<!-- QIBLA COMPASS -->
+<div id="qiblaCompass" title="اتجاه القبلة">
+  <span class="arrow" id="qiblaArrow">🕋</span>
+  <span class="label">قبلة</span>
+</div>
+
+<!-- MAP FABs -->
+<div class="map-fab">
+  <button id="btnLocate" title="موقعي">📍</button>
+  <button id="btnPickLocation" title="اختر موقعًا">🎯</button>
+  <button id="btnLayer" title="نمط الخريطة">🎨</button>
+  <button id="btnQibla" title="القبلة">🕌</button>
+  <button id="btnMeasure" title="قياس المسافة">📏</button>
+</div>
+
+<!-- SHEET -->
+<div class="sheet peek" id="sheet">
+  <div class="sheet-handle" id="sheetHandle"></div>
+  <div class="sheet-header">
+    <div style="flex:1;">
+      <div class="sheet-title" id="sheetTitle">قريب منك</div>
+      <div class="sheet-subtitle" id="sheetSubtitle">جارٍ التحميل...</div>
+    </div>
+    <button class="btn-round" id="btnRefresh" style="width:40px;height:40px;font-size:16px;">🔄</button>
+  </div>
+  <div class="sheet-tabs">
+    <button class="sheet-tab active" data-tab="all">🗺️ الكل</button>
+    <button class="sheet-tab" data-tab="open">🟢 مفتوح</button>
+    <button class="sheet-tab" data-tab="closed">🔴 مغلق</button>
+    <button class="sheet-tab" data-tab="fav">⭐ مفضلة</button>
+    <button class="sheet-tab" data-tab="visited">✅ زرت</button>
+    <button class="sheet-tab" data-tab="chart">📊 إحصائيات</button>
+  </div>
+  <div class="sheet-body" id="sheetBody">
+    <div id="tabContentAll">
+      <div class="search-input-wrap">
+        <input type="text" class="search-input" id="searchInput" placeholder="🔎 ابحث بالاسم..." />
+        <button class="btn-round" id="btnClearSearch" style="width:48px;height:48px;font-size:16px;">✕</button>
+      </div>
+      <div class="search-history" id="searchHistory"></div>
+      <div class="distance-filter">
+        <div class="label">
+          <span>📏 الحد الأقصى للمسافة</span>
+          <span class="value" id="distanceValue">كل المسافات</span>
+        </div>
+        <input type="range" id="distanceSlider" min="100" max="10000" value="10000" step="100" />
+      </div>
+      <div class="chips" id="typeChips"></div>
+      <div class="stats-bar" id="statsBar"></div>
+    </div>
+    <div id="tabContentFav" class="hidden">
+      <div class="empty-state" id="favEmpty" style="display:none;">
+        <div class="icon">⭐</div>
+        <div class="title">لا توجد مفضلة بعد</div>
+        <div class="sub">انقر على النجمة في أي مكان لإضافته</div>
+      </div>
+    </div>
+    <div id="tabContentVisited" class="hidden">
+      <div class="empty-state" id="visitedEmpty" style="display:none;">
+        <div class="icon">✅</div>
+        <div class="title">لم تزر أي مكان بعد</div>
+        <div class="sub">انقر على "زرت هذا المكان" في أي بطاقة</div>
+      </div>
+    </div>
+    <div id="tabContentChart" class="hidden">
+      <div id="chartContent"></div>
+    </div>
+    <div class="list" id="list"></div>
+  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" data-nav="list">
+    <span class="icon">📋</span><span>الأماكن</span>
+  </button>
+  <button class="nav-btn" data-nav="nearby">
+    <span class="icon">⭐</span><span>أقرب مفتوح</span>
+  </button>
+  <button class="nav-btn" data-nav="locate">
+    <span class="icon">📍</span><span>موقعي</span>
+  </button>
+  <button class="nav-btn" data-nav="fav">
+    <span class="icon">❤️</span><span>المفضلة</span>
+    <span class="nav-badge hidden" id="navFavBadge">0</span>
+  </button>
+  <button class="nav-btn" data-nav="more">
+    <span class="icon">⚙️</span><span>المزيد</span>
+  </button>
+</nav>
+
+<!-- PRIVACY -->
+<div class="privacy-notice" id="privacyNotice">
+  <span class="icon">🔒</span>
+  <div class="text"><b>خصوصيتك مهمة.</b> يُحفظ موقعك ومفضلاتك وتقييماتك على جهازك فقط.</div>
+  <button class="btn" id="privacyAccept">فهمت</button>
+</div>
+
+<!-- LIBRARIES -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+<script>
+/* =========================================================
+   قريب — App Logic
+   ========================================================= */
+'use strict';
+
+/* ---------- State ---------- */
+const APP = {
+  state: {
+    userPos: null,
+    places: [],
+    filtered: [],
+    favorites: JSON.parse(localStorage.getItem('q_fav') || '[]'),
+    visited: JSON.parse(localStorage.getItem('q_visited') || '[]'),
+    reviews: JSON.parse(localStorage.getItem('q_reviews') || '{}'),
+    photos: JSON.parse(localStorage.getItem('q_photos') || '{}'),
+    searchHistory: JSON.parse(localStorage.getItem('q_history') || '[]'),
+    currentTab: 'all',
+    currentType: 'all',
+    maxDistance: 10000,
+    searchQuery: '',
+    sheetState: 'peek',
+    mapLayer: localStorage.getItem('q_layer') || 'dark',
+    picking: false,
+    measuring: false,
+  },
+  map: null,
+  cluster: null,
+  layers: {},
+  markers: new Map(),
+  measureMarkers: [],
+  measureLine: null,
+};
+
+const $ = (id) => document.getElementById(id);
+const save = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371e3;
+  const φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180;
+  const Δφ = (lat2-lat1) * Math.PI/180;
+  const Δλ = (lon2-lon1) * Math.PI/180;
+  const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function fmtDist(m) {
+  return m < 1000 ? `${Math.round(m)} م` : `${(m/1000).toFixed(1)} كم`;
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+let toastTimer;
+function toast(msg, ms = 2200) {
+  document.querySelectorAll('.toast').forEach(t => t.remove());
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('show'));
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    t.classList.remove('show');
+    setTimeout(() => t.remove(), 300);
+  }, ms);
+}
+
+/* ---------- Type mapping ---------- */
+const TYPE_MAP = {
+  restaurant:  { emoji: '🍽️', label: 'مطعم',  color: '#ef4444' },
+  fast_food:   { emoji: '🍔', label: 'وجبات', color: '#f97316' },
+  cafe:        { emoji: '☕',  label: 'مقهى',  color: '#a16207' },
+  pharmacy:    { emoji: '💊', label: 'صيدلية', color: '#10b981' },
+  hospital:    { emoji: '🏥', label: 'مستشفى', color: '#ef4444' },
+  clinic:      { emoji: '🩺', label: 'عيادة',  color: '#ec4899' },
+  school:      { emoji: '🏫', label: 'مدرسة',  color: '#3b82f6' },
+  university:  { emoji: '🎓', label: 'جامعة',  color: '#6366f1' },
+  bank:        { emoji: '🏦', label: 'بنك',    color: '#8b5cf6' },
+  atm:         { emoji: '🏧', label: 'صراف',   color: '#8b5cf6' },
+  fuel:        { emoji: '⛽', label: 'وقود',   color: '#f97316' },
+  supermarket: { emoji: '🛒', label: 'سوق',    color: '#22c55e' },
+  bakery:      { emoji: '🥖', label: 'مخبزة',  color: '#f59e0b' },
+  mosque:      { emoji: '🕌', label: 'مسجد',   color: '#14b8a6' },
+  place_of_worship: { emoji: '🕌', label: 'دور عبادة', color: '#14b8a6' },
+  hotel:       { emoji: '🏨', label: 'فندق',   color: '#6366f1' },
+  parking:     { emoji: '🅿️', label: 'موقف',   color: '#64748b' },
+  police:      { emoji: '🚓', label: 'شرطة',   color: '#1e40af' },
+  fire_station:{ emoji: '🚒', label: 'مطافئ', color: '#dc2626' },
+  post_office: { emoji: '📮', label: 'بريد',   color: '#eab308' },
+  library:     { emoji: '📚', label: 'مكتبة',  color: '#8b5cf6' },
+  park:        { emoji: '🌳', label: 'حديقة',  color: '#22c55e' },
+  playground:  { emoji: '🎠', label: 'ملعب أطفال', color: '#06b6d4' },
+  fitness_centre: { emoji: '💪', label: 'نادٍ', color: '#ef4444' },
+  cinema:      { emoji: '🎬', label: 'سينما', color: '#a855f7' },
+  theatre:     { emoji: '🎭', label: 'مسرح',  color: '#a855f7' },
+  bar:         { emoji: '🍺', label: 'بار',    color: '#b45309' },
+  pub:         { emoji: '🍻', label: 'حانة',   color: '#b45309' },
+  bookstore:   { emoji: '📖', label: 'مكتبة كتب', color: '#8b5cf6' },
+  clothes:     { emoji: '👕', label: 'ملابس', color: '#f472b6' },
+  electronics: { emoji: '📱', label: 'إلكترونيات', color: '#0ea5e9' },
+  hairdresser: { emoji: '💇', label: 'حلاق',  color: '#ec4899' },
+  dentist:     { emoji: '🦷', label: 'طبيب أسنان', color: '#06b6d4' },
+  veterinary:  { emoji: '🐾', label: 'بيطري', color: '#84cc16' },
+  marketplace: { emoji: '🏪', label: 'سوق عام', color: '#16a34a' },
+  other:       { emoji: '📍', label: 'مكان',   color: '#64748b' },
+};
+
+function getTypeInfo(type) {
+  return TYPE_MAP[type] || TYPE_MAP.other;
+}
+
+function getType(tags = {}) {
+  if (tags.amenity)  return tags.amenity;
+  if (tags.shop)     return tags.shop;
+  if (tags.leisure)  return tags.leisure;
+  if (tags.tourism)  return tags.tourism === 'hotel' ? 'hotel' : 'other';
+  return 'other';
+}
+
+/* ---------- Opening hours parser ---------- */
+function parseOpeningHours(str) {
+  if (!str) return { open: null, schedule: [], always: false };
+  const s = str.trim();
+  if (s === '24/7') return { open: true, always: true, schedule: [] };
+
+  const dayMap = { Su:0, Mo:1, Tu:2, We:3, Th:4, Fr:5, Sa:6 };
+  const days = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+  const now = new Date();
+  const today = now.getDay();
+  const minsNow = now.getHours() * 60 + now.getMinutes();
+
+  const parts = s.split(';').map(p => p.trim()).filter(Boolean);
+  let open = null;
+
+  for (const p of parts) {
+    // Mo-Fr 09:00-17:00  |  Sa 10:00-14:00
+    const m = p.match(/^([A-Za-z,\-]+)\s+(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
+    if (!m) continue;
+    const [, daySpec, h1, m1, h2, m2] = m;
+    const inDay = daySpec.split(',').some(d => {
+      if (d.includes('-')) {
+        const [a, b] = d.split('-');
+        const ai = dayMap[a], bi = dayMap[b];
+        if (ai === undefined || bi === undefined) return false;
+        if (ai <= bi) return today >= ai && today <= bi;
+        return today >= ai || today <= bi;
+      }
+      return dayMap[d] === today;
+    });
+    if (!inDay) continue;
+
+    const start = +h1 * 60 + +m1;
+    const end   = +h2 * 60 + +m2;
+    if (minsNow >= start && minsNow <= end) { open = true; break; }
+    if (open !== true) open = false;
+  }
+
+  return { open, schedule: parts, always: false };
+}
+
+/* ---------- Overpass fetch ---------- */
+async function fetchNearby(lat, lon, radius = 2000) {
+  const query = `
+    [out:json][timeout:25];
+    (
+      node["amenity"](around:${radius},${lat},${lon});
+      node["shop"](around:${radius},${lat},${lon});
+      node["leisure"](around:${radius},${lat},${lon});
+      node["tourism"](around:${radius},${lat},${lon});
+    );
+    out body 250;
+  `;
+  const res = await fetch('https://overpass-api.de/api/interpreter', {
+    method: 'POST',
+    body: 'data=' + encodeURIComponent(query),
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  });
+  if (!res.ok) throw new Error('Overpass failed: ' + res.status);
+  const data = await res.json();
+
+  return data.elements
+    .filter(e => e.tags && e.tags.name)
+    .map(e => {
+      const type = getType(e.tags);
+      const info = getTypeInfo(type);
+      const dist = haversine(lat, lon, e.lat, e.lon);
+      const hours = parseOpeningHours(e.tags.opening_hours);
+      return {
+        id: String(e.id),
+        name: e.tags.name,
+        lat: e.lat,
+        lon: e.lon,
+        type,
+        emoji: info.emoji,
+        label: info.label,
+        color: info.color,
+        address: [
+          e.tags['addr:street'],
+          e.tags['addr:housenumber'],
+          e.tags['addr:city'],
+        ].filter(Boolean).join(' ') || '',
+        phone: e.tags.phone || e.tags['contact:phone'] || '',
+        website: e.tags.website || e.tags['contact:website'] || '',
+        hours: e.tags.opening_hours || '',
+        hoursOpen: hours.open,
+        hoursAlways: hours.always,
+        schedule: hours.schedule,
+        cuisine: e.tags.cuisine || '',
+        distance: dist,
+        tags: e.tags,
+      };
+    })
+    .filter(p => p.distance <= radius + 500)
+    .sort((a, b) => a.distance - b.distance);
+}
+
+/* =========================================================
+   MAP
+   ========================================================= */
+function initMap(lat, lon) {
+  if (APP.map) {
+    APP.map.setView([lat, lon], 15);
+    return;
+  }
+
+  APP.map = L.map('map', {
+    zoomControl: false,
+    attributionControl: true,
+    preferCanvas: true,
+  }).setView([lat, lon], 15);
+
+  APP.layers = {
+    dark:  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19, attribution: '© OSM © CARTO'
+    }),
+    light: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19, attribution: '© OSM © CARTO'
+    }),
+    satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19, attribution: '© Esri'
+    }),
+  };
+
+  (APP.layers[APP.state.mapLayer] || APP.layers.dark).addTo(APP.map);
+
+  APP.cluster = L.markerClusterGroup({
+    maxClusterRadius: 60,
+    spiderfyOnMaxZoom: true,
+    showCoverageOnHover: false,
+    iconCreateFunction: (cluster) => {
+      const n = cluster.getChildCount();
+      let cls = 'small';
+      if (n >= 50) cls = 'large';
+      else if (n >= 10) cls = 'medium';
+      return L.divIcon({
+        html: `<div>${n}</div>`,
+        className: `marker-cluster marker-cluster-${cls}`,
+        iconSize: L.point(40, 40),
+      });
+    },
+  });
+  APP.map.addLayer(APP.cluster);
+
+  // user position circle
+  L.circleMarker([lat, lon], {
+    radius: 8, color: '#fff', weight: 3,
+    fillColor: '#3b82f6', fillOpacity: 1,
+  }).addTo(APP.map);
+  L.circle([lat, lon], {
+    radius: 30, color: '#3b82f6',
+    fillColor: '#3b82f6', fillOpacity: 0.15, weight: 0,
+  }).addTo(APP.map);
+
+  APP.map.on('click', onMapClick);
+}
+
+function makeMarkerIcon(place) {
+  const isOpen = place.hoursOpen === true;
+  const isClosed = place.hoursOpen === false;
+  const statusCls = isOpen ? 'open-status' : isClosed ? 'closed-status' : 'unknown-status';
+  const statusTxt = isOpen ? '✓' : isClosed ? '✕' : '?';
+  const isFav = APP.state.favorites.includes(place.id);
+
+  return L.divIcon({
+    className: '',
+    html: `
+      <div class="custom-marker-wrapper">
+        <div class="custom-marker-bubble" style="background:${place.color};">
+          <div class="custom-marker-bubble-inner">${place.emoji}</div>
+        </div>
+        ${isFav ? '<div style="position:absolute;top:-4px;right:-4px;font-size:14px;">⭐</div>' : ''}
+        <div class="custom-marker-status ${statusCls}">${statusTxt}</div>
+      </div>`,
+    iconSize: [40, 46],
+    iconAnchor: [20, 46],
+  });
+}
+
+function renderMarkers(places) {
+  if (!APP.cluster) return;
+  APP.cluster.clearLayers();
+  APP.markers.clear();
+  places.forEach(p => {
+    const m = L.marker([p.lat, p.lon], {
+      icon: makeMarkerIcon(p),
+      title: p.name,
+    });
+    m.on('click', () => openDetail(p));
+    APP.cluster.addLayer(m);
+    APP.markers.set(p.id, m);
+  });
+}
+
+function focusPlace(place) {
+  if (!APP.map) return;
+  APP.map.setView([place.lat, place.lon], 17, { animate: true });
+  const m = APP.markers.get(place.id);
+  if (m && APP.cluster) APP.cluster.zoomToShowLayer(m, () => {});
+}
+
+/* =========================================================
+   FILTER + RENDER
+   ========================================================= */
+function applyFilters() {
+  const s = APP.state;
+  let out = s.places.slice();
+
+  if (s.currentTab === 'open')     out = out.filter(p => p.hoursOpen === true);
+  if (s.currentTab === 'closed')   out = out.filter(p => p.hoursOpen === false);
+  if (s.currentTab === 'fav')      out = out.filter(p => s.favorites.includes(p.id));
+  if (s.currentTab === 'visited')  out = out.filter(p => s.visited.includes(p.id));
+
+  if (s.currentType !== 'all') out = out.filter(p => p.type === s.currentType);
+
+  out = out.filter(p => p.distance <= s.maxDistance);
+
+  if (s.searchQuery.trim()) {
+    const q = s.searchQuery.trim().toLowerCase();
+    out = out.filter(p =>
+      p.name.toLowerCase().includes(q) ||
+      p.label.toLowerCase().includes(q)
+    );
+  }
+
+  out.sort((a, b) => a.distance - b.distance);
+  APP.state.filtered = out;
+  renderList(out);
+  renderStats(out);
+  renderMarkers(out);
+  updateSheetSubtitle(out);
+  updateEmptyStates(out);
+}
+
+function updateSheetSubtitle(list) {
+  const n = list.length;
+  $('sheetSubtitle').textContent = n ? `${n} مكان قريب` : 'لا توجد أماكن';
+}
+
+function updateEmptyStates(list) {
+  const favList = list.filter(p => APP.state.favorites.includes(p.id));
+  const visList = list.filter(p => APP.state.visited.includes(p.id));
+  $('favEmpty').style.display = favList.length === 0 ? 'block' : 'none';
+  $('visitedEmpty').style.display = visList.length === 0 ? 'block' : 'none';
+}
+
+function renderStats(list) {
+  const open = list.filter(p => p.hoursOpen === true).length;
+  const closed = list.filter(p => p.hoursOpen === false).length;
+  const unknown = list.filter(p => p.hoursOpen === null).length;
+  $('statsBar').innerHTML = `
+    <div class="stat-pill"><div class="num">${list.length}</div><div class="lbl">الإجمالي</div></div>
+    <div class="stat-pill open-p"><div class="num">${open}</div><div class="lbl">مفتوح</div></div>
+    <div class="stat-pill closed-p"><div class="num">${closed}</div><div class="lbl">مغلق</div></div>
+    <div class="stat-pill unknown-p"><div class="num">${unknown}</div><div class="lbl">غير معروف</div></div>`;
+}
+
+function renderList(list) {
+  const wrap = $('list');
+  if (!list.length) {
+    wrap.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">🔍</div>
+        <div class="title">لا توجد نتائج</div>
+        <div class="sub">جرّب توسيع نطاق البحث أو تغيير الفلاتر</div>
+      </div>`;
+    return;
+  }
+  wrap.innerHTML = list.map(p => {
+    const isFav = APP.state.favorites.includes(p.id);
+    const isVisited = APP.state.visited.includes(p.id);
+    const statusCls = p.hoursOpen === true ? 'open' : p.hoursOpen === false ? 'closed' : 'unknown';
+    const statusTxt = p.hoursOpen === true ? '🟢 مفتوح' : p.hoursOpen === false ? '🔴 مغلق' : '⚪';
+    const photoCount = (APP.state.photos[p.id] || []).length;
+    const reviewCount = (APP.state.reviews[p.id] || []).length;
+
+    return `
+      <div class="item" data-id="${p.id}">
+        <div class="item-thumb">
+          ${p.emoji}
+          ${isVisited ? '<span class="visited-badge">✓</span>' : ''}
+          ${photoCount ? `<span class="photo-badge">📷 ${photoCount}</span>` : ''}
+        </div>
+        <div class="item-info">
+          <div class="item-name">${escapeHtml(p.name)}</div>
+          <div class="item-meta">
+            <span>${p.label}</span>
+            <span>• ${fmtDist(p.distance)}</span>
+            ${reviewCount ? `<span>• ⭐ ${reviewCount}</span>` : ''}
+          </div>
+        </div>
+        <div class="item-status ${statusCls}">${statusTxt}</div>
+        <button class="item-fav ${isFav ? 'active' : ''}" data-fav="${p.id}">${isFav ? '⭐' : '☆'}</button>
+      </div>`;
+  }).join('');
+
+  wrap.querySelectorAll('.item').forEach(el => {
+    el.addEventListener('click', (ev) => {
+      if (ev.target.closest('.item-fav')) return;
+      const p = APP.state.places.find(x => x.id === el.dataset.id);
+      if (p) { focusPlace(p); openDetail(p); }
+    });
+  });
+  wrap.querySelectorAll('.item-fav').forEach(btn => {
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      toggleFav(btn.dataset.fav);
+    });
+  });
+}
+
+/* =========================================================
+   FAVORITES / VISITED
+   ========================================================= */
+function toggleFav(id) {
+  const i = APP.state.favorites.indexOf(id);
+  if (i >= 0) APP.state.favorites.splice(i, 1);
+  else APP.state.favorites.push(id);
+  save('q_fav', APP.state.favorites);
+  updateFavBadge();
+  applyFilters();
+  const place = APP.state.places.find(p => p.id === id);
+  if (place) {
+    const m = APP.markers.get(id);
+    if (m) m.setIcon(makeMarkerIcon(place));
+  }
+  toast(i >= 0 ? 'أُزيل من المفضلة' : 'أُضيف إلى المفضلة ⭐');
+}
+
+function updateFavBadge() {
+  const b = $('navFavBadge');
+  const n = APP.state.favorites.length;
+  b.textContent = n;
+  b.classList.toggle('hidden', n === 0);
+}
+
+function toggleVisited(id) {
+  const i = APP.state.visited.indexOf(id);
+  if (i >= 0) APP.state.visited.splice(i, 1);
+  else APP.state.visited.push(id);
+  save('q_visited', APP.state.visited);
+  applyFilters();
+  toast(i >= 0 ? 'أُزيل من "زرت"' : 'تم تحديده كـ "زرت" ✅');
+}
+
+/* =========================================================
+   DETAIL SHEET
+   ========================================================= */
+function openDetail(place) {
+  document.querySelectorAll('.detail-sheet, .detail-sheet-overlay').forEach(el => el.remove());
+
+  const ov = document.createElement('div');
+  ov.className = 'detail-sheet-overlay';
+  document.body.appendChild(ov);
+
+  const isFav = APP.state.favorites.includes(place.id);
+  const isVisited = APP.state.visited.includes(place.id);
+  const statusCls = place.hoursOpen === true ? 'open' : place.hoursOpen === false ? 'closed' : 'unknown';
+  const statusTxt = place.hoursOpen === true ? '🟢 مفتوح الآن' : place.hoursOpen === false ? '🔴 مغلق الآن' : '⚪ غير معروف';
+
+  const reviews = APP.state.reviews[place.id] || [];
+  const photos = APP.state.photos[place.id] || [];
+
+  const sheet = document.createElement('div');
+  sheet.className = 'detail-sheet';
+  sheet.innerHTML = `
+    <div class="detail-sheet-handle"></div>
+    <div class="detail-sheet-header">
+      <div class="detail-sheet-emoji">${place.emoji}</div>
+      <div class="detail-sheet-titles">
+        <div class="detail-sheet-title">${escapeHtml(place.name)}</div>
+        <div class="detail-sheet-sub">
+          <span>${place.label}</span>
+          <span>• ${fmtDist(place.distance)}</span>
+          <span class="item-status ${statusCls}" style="padding:2px 8px;">${statusTxt}</span>
+        </div>
+      </div>
+      <button class="detail-sheet-close" data-close>✕</button>
+    </div>
+
+    <div class="detail-tabs">
+      <button class="detail-tab active" data-dtab="info">ℹ️ معلومات</button>
+      <button class="detail-tab" data-dtab="reviews">⭐ تقييمات (${reviews.length})</button>
+      <button class="detail-tab" data-dtab="photos">📷 صور (${photos.length})</button>
+    </div>
+
+    <div class="detail-sheet-body">
+      <div class="detail-tab-content active" data-tcontent="info">
+        ${place.address ? row('📍', 'العنوان', escapeHtml(place.address), place.address) : ''}
+        ${place.phone ? row('📞', 'الهاتف', `<a href="tel:${escapeHtml(place.phone)}" class="dr-value">${escapeHtml(place.phone)}</a>`, place.phone) : ''}
+        ${place.website ? row('🌐', 'الموقع', `<a href="${escapeHtml(place.website)}" target="_blank" rel="noopener" class="dr-value">${escapeHtml(place.website)}</a>`) : ''}
+        ${place.hours ? row('🕐', 'ساعات العمل', escapeHtml(place.hours)) : ''}
+        ${place.hoursAlways ? row('✅', 'مفتوح 24/7', 'يعمل على مدار الساعة') : ''}
+        ${place.schedule && place.schedule.length ? scheduleHtml(place.schedule) : ''}
+        ${row('📏', 'المسافة', fmtDist(place.distance) + ' من موقعك')}
+        ${row('🌐', 'الإحداثيات', `${place.lat.toFixed(5)}, ${place.lon.toFixed(5)}`, `${place.lat},${place.lon}`)}
+      </div>
+
+      <div class="detail-tab-content" data-tcontent="reviews">
+        <div class="rating-summary">
+          <div>
+            <div class="rating-big">${reviews.length ? (reviews.reduce((s,r)=>s+r.rating,0)/reviews.length).toFixed(1) : '—'}</div>
+            <div class="rating-stars-big">${reviews.length ? '★'.repeat(Math.round(reviews.reduce((s,r)=>s+r.rating,0)/reviews.length)) : '☆☆☆☆☆'}</div>
+            <div class="rating-count">${reviews.length} تقييم</div>
+          </div>
+        </div>
+        <div class="rating-input" data-ratinginput>
+          ${[1,2,3,4,5].map(i => `<button class="star-btn" data-star="${i}">★</button>`).join('')}
+        </div>
+        <textarea class="review-textarea" placeholder="اكتب رأيك..." rows="3" data-reviewtext></textarea>
+        <button class="modal-btn" style="margin-top:8px;" data-submitreview>إرسال التقييم</button>
+        <div style="margin-top:16px;" data-reviewslist>
+          ${reviews.length ? reviews.map((r, i) => reviewHtml(r, i)).join('') : '<div class="empty-state"><div class="icon">💬</div><div class="title">لا توجد تقييمات</div><div class="sub">كن أول من يقيّم</div></div>'}
+        </div>
+      </div>
+
+      <div class="detail-tab-content" data-tcontent="photos">
+        <div class="photo-upload-zone" data-photozone style="border:2px dashed var(--border-strong);border-radius:14px;padding:24px;text-align:center;cursor:pointer;background:var(--bg-surface-2);">
+          <div style="font-size:36px;margin-bottom:8px;">📷</div>
+          <div style="font-size:14px;font-weight:600;">أضف صورة</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">من الكاميرا أو المعرض</div>
+        </div>
+        <input type="file" accept="image/*" multiple hidden data-photoinput />
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px;" data-photosgrid>
+          ${photos.map((src, i) => `
+            <div style="aspect-ratio:1;border-radius:10px;overflow:hidden;position:relative;background:var(--bg-surface-2);">
+              <img src="${src}" style="width:100%;height:100%;object-fit:cover;" />
+              <button style="position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;border:none;font-size:12px;" data-rmphoto="${i}">✕</button>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-actions">
+      <a class="detail-action gmaps-btn" target="_blank" rel="noopener"
+         href="https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lon}">
+        <span class="icon">🗺️</span><span>خرائط جوجل</span>
+      </a>
+      <a class="detail-action" target="_blank" rel="noopener"
+         href="https://www.openstreetmap.org/?mlat=${place.lat}&mlon=${place.lon}#map=18/${place.lat}/${place.lon}">
+        <span class="icon">🌍</span><span>OSM</span>
+      </a>
+      <button class="detail-action fav-action ${isFav ? 'active' : ''}" data-action="fav">
+        <span class="icon">${isFav ? '⭐' : '☆'}</span><span>مفضلة</span>
+      </button>
+      <button class="detail-action visited-action ${isVisited ? 'active' : ''}" data-action="visited">
+        <span class="icon">${isVisited ? '✅' : '○'}</span><span>زرت</span>
+      </button>
+    </div>
+  `;
+
+  document.body.appendChild(sheet);
+  requestAnimationFrame(() => {
+    sheet.classList.add('show');
+    ov.classList.add('show');
+  });
+
+  const close = () => {
+    sheet.classList.remove('show');
+    ov.classList.remove('show');
+    setTimeout(() => { sheet.remove(); ov.remove(); }, 300);
+  };
+  ov.addEventListener('click', close);
+  sheet.querySelector('[data-close]').addEventListener('click', close);
+
+  sheet.querySelectorAll('.detail-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      sheet.querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active'));
+      sheet.querySelectorAll('.detail-tab-content').forEach(c => c.classList.remove('active'));
+      tab.classList.add('active');
+      sheet.querySelector(`[data-tcontent="${tab.dataset.dtab}"]`).classList.add('active');
+    });
+  });
+
+  sheet.querySelector('[data-action="fav"]').addEventListener('click', () => {
+    toggleFav(place.id);
+    const btn = sheet.querySelector('[data-action="fav"]');
+    const isF = APP.state.favorites.includes(place.id);
+    btn.classList.toggle('active', isF);
+    btn.querySelector('.icon').textContent = isF ? '⭐' : '☆';
+  });
+
+  sheet.querySelector('[data-action="visited"]').addEventListener('click', () => {
+    toggleVisited(place.id);
+    const btn = sheet.querySelector('[data-action="visited"]');
+    const isV = APP.state.visited.includes(place.id);
+    btn.classList.toggle('active', isV);
+    btn.querySelector('.icon').textContent = isV ? '✅' : '○';
+  });
+
+  // reviews
+  let selectedRating = 0;
+  sheet.querySelectorAll('.star-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectedRating = +btn.dataset.star;
+      sheet.querySelectorAll('.star-btn').forEach(b => {
+        b.classList.toggle('active', +b.dataset.star <= selectedRating);
+      });
+    });
+  });
+  sheet.querySelector('[data-submitreview]').addEventListener('click', () => {
+    const text = sheet.querySelector('[data-reviewtext]').value.trim();
+    if (!selectedRating) return toast('اختر عدد النجوم');
+    if (!text) return toast('اكتب رأيك');
+    const list = APP.state.reviews[place.id] || [];
+    list.unshift({ rating: selectedRating, text, date: new Date().toISOString() });
+    APP.state.reviews[place.id] = list;
+    save('q_reviews', APP.state.reviews);
+    toast('تم إرسال تقييمك ✅');
+    close();
+    setTimeout(() => openDetail(place), 350);
+  });
+  sheet.querySelectorAll('[data-rmreview]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = +btn.dataset.rmreview;
+      APP.state.reviews[place.id].splice(idx, 1);
+      save('q_reviews', APP.state.reviews);
+      close();
+      setTimeout(() => openDetail(place), 350);
+    });
+  });
+
+  // photos
+  const fileInput = sheet.querySelector('[data-photoinput]');
+  sheet.querySelector('[data-photozone]').addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', (e) => {
+    const files = Array.from(e.target.files || []).slice(0, 4);
+    if (!files.length) return;
+    let loaded = 0;
+    const arr = APP.state.photos[place.id] || [];
+    files.forEach(f => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        arr.push(reader.result);
+        loaded++;
+        if (loaded === files.length) {
+          APP.state.photos[place.id] = arr.slice(0, 12);
+          try {
+            save('q_photos', APP.state.photos);
+          } catch (err) {
+            toast('الذاكرة ممتلئة');
+          }
+          toast(`تمت إضافة ${files.length} صورة 📷`);
+          close();
+          setTimeout(() => openDetail(place), 350);
+        }
+      };
+      reader.readAsDataURL(f);
+    });
+  });
+  sheet.querySelectorAll('[data-rmphoto]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = +btn.dataset.rmphoto;
+      APP.state.photos[place.id].splice(idx, 1);
+      save('q_photos', APP.state.photos);
+      close();
+      setTimeout(() => openDetail(place), 350);
+    });
+  });
+}
+
+function row(icon, label, value, copyText) {
+  return `
+    <div class="detail-row">
+      <div class="dr-icon">${icon}</div>
+      <div class="dr-content">
+        <div class="dr-label">
+          <span>${label}</span>
+          ${copyText ? `<button class="dr-copy" data-copy="${escapeHtml(copyText)}">📋 نسخ</button>` : ''}
+        </div>
+        <div class="dr-value">${value}</div>
+      </div>
+    </div>`;
+}
+
+function scheduleHtml(parts) {
+  const dayNames = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  const today = new Date().getDay();
+  return `<div class="detail-row">
+    <div class="dr-icon">📅</div>
+    <div class="dr-content">
+      <div class="dr-label">الجدول الأسبوعي</div>
+      <div style="background:var(--bg-surface-2);border-radius:10px;padding:10px;">
+        <div style="font-size:13px;padding:6px 8px;background:var(--accent-soft);border-radius:6px;font-weight:700;">
+          اليوم (${dayNames[today]}): ${parts.join(' • ') || '—'}
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:8px;text-align:center;font-style:italic;">
+        بيانات من OpenStreetMap — قد تكون غير دقيقة
+      </div>
+    </div>
+  </div>`;
+}
+
+function reviewHtml(r, idx) {
+  return `
+    <div class="review-card">
+      <div class="review-header">
+        <div class="review-avatar">أنا</div>
+        <div class="review-info">
+          <div class="review-name">أنت</div>
+          <div class="review-date">${new Date(r.date).toLocaleDateString('ar')}</div>
+        </div>
+        <button class="review-delete" data-rmreview="${idx}">حذف</button>
+      </div>
+      <div class="review-stars">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</div>
+      <div class="review-text">${escapeHtml(r.text)}</div>
+    </div>`;
+}
+
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-copy]');
+  if (btn) {
+    const txt = btn.dataset.copy;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(txt).then(() => toast('تم النسخ 📋')).catch(() => toast('تعذر النسخ'));
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = txt;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+      toast('تم النسخ 📋');
+    }
+  }
+});
+
+/* =========================================================
+   QIBLA
+   ========================================================= */
+function qiblaBearing(lat, lon) {
+  const kLat = 21.4225 * Math.PI/180;
+  const kLon = 39.8262 * Math.PI/180;
+  const φ = lat * Math.PI/180;
+  const Δλ = kLon - lon * Math.PI/180;
+  const y = Math.sin(Δλ);
+  const x = Math.cos(φ) * Math.tan(kLat) - Math.sin(φ) * Math.cos(Δλ);
+  return (Math.atan2(y, x) * 180/Math.PI + 360) % 360;
+}
+
+let qiblaListener = null;
+function openQibla() {
+  const u = APP.state.userPos;
+  if (!u) return toast('حدّد موقعك أولاً');
+  const bearing = qiblaBearing(u.lat, u.lon);
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay show';
+  modal.innerHTML = `
+    <div class="modal">
+      <button class="modal-close" data-close>✕</button>
+      <div class="modal-title">🕋 اتجاه القبلة</div>
+      <div class="modal-sub">من موقعك الحالي نحو الكعبة</div>
+      <div style="text-align:center;">
+        <div class="qibla-compass-big"><span class="qibla-arrow-big" data-arrow>⬆️</span></div>
+        <div class="qibla-degrees">${bearing.toFixed(1)}°</div>
+        <div style="font-size:12px;color:var(--text-muted);padding:0 20px;line-height:1.6;">
+          وجّه جهازك أفقيًا. يدور السهم تلقائيًا حسب اتجاهك.
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  const arrow = modal.querySelector('[data-arrow]');
+
+  const onOrient = (e) => {
+    let heading = null;
+    if (typeof e.webkitCompassHeading === 'number') {
+      heading = e.webkitCompassHeading;
+    } else if (typeof e.alpha === 'number' && (e.absolute || e.type === 'deviceorientationabsolute')) {
+      heading = 360 - e.alpha;
+    }
+    if (heading !== null) {
+      arrow.style.transform = `rotate(${bearing - heading}deg)`;
+    }
+  };
+
+  const attach = () => {
+    if (window.DeviceOrientationEvent) {
+      window.addEventListener('deviceorientationabsolute', onOrient, true);
+      window.addEventListener('deviceorientation', onOrient, true);
+      qiblaListener = onOrient;
+    }
+  };
+
+  if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    DeviceOrientationEvent.requestPermission().then(p => {
+      if (p === 'granted') attach();
+      else toast('الصلاحية مرفوضة — السهم ثابت');
+    }).catch(() => {});
+  } else {
+    attach();
+  }
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal || e.target.closest('[data-close]')) {
+      if (qiblaListener) {
+        window.removeEventListener('deviceorientationabsolute', qiblaListener, true);
+        window.removeEventListener('deviceorientation', qiblaListener, true);
+        qiblaListener = null;
+      }
+      modal.remove();
+    }
+  });
+}
+
+/* =========================================================
+   SHEET DRAG
+   ========================================================= */
+function initSheetDrag() {
+  const sheet = $('sheet');
+  const handle = $('sheetHandle');
+  if (!sheet || !handle) return;
+
+  let startY = 0, startTranslate = 0, isDragging = false;
+
+  const getTranslate = () => {
+    const t = getComputedStyle(sheet).transform;
+    if (t === 'none') return 0;
+    return new DOMMatrixReadOnly(t).m42;
+  };
+
+  const snapTo = (state) => {
+    sheet.classList.remove('peek', 'half', 'full');
+    sheet.classList.add(state);
+    APP.state.sheetState = state;
+  };
+
+  const down = (e) => {
+    isDragging = true;
+    startY = (e.touches ? e.touches[0].clientY : e.clientY);
+    startTranslate = getTranslate();
+    sheet.classList.add('dragging');
+  };
+  const move = (e) => {
+    if (!isDragging) return;
+    const y = (e.touches ? e.touches[0].clientY : e.clientY);
+    const dy = y - startY;
+    let nt = startTranslate + dy;
+    const minT = -window.innerHeight + 80;
+    const maxT = 0;
+    nt = Math.max(minT, Math.min(maxT, nt));
+    sheet.style.transform = `translateY(${nt}px)`;
+    if (e.cancelable) e.preventDefault();
+  };
+  const up = () => {
+    if (!isDragging) return;
+    isDragging = false;
+    sheet.classList.remove('dragging');
+    sheet.style.transform = '';
+    const t = getTranslate();
+    const h = window.innerHeight;
+    if (t > -h * 0.15) snapTo('peek');
+    else if (t > -h * 0.55) snapTo('half');
+    else snapTo('full');
+  };
+
+  handle.addEventListener('touchstart', down, { passive: true });
+  handle.addEventListener('touchmove', move, { passive: false });
+  handle.addEventListener('touchend', up);
+  handle.addEventListener('touchcancel', up);
+  handle.addEventListener('mousedown', down);
+  window.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', up);
+
+  sheet.addEventListener('click', (e) => {
+    if (APP.state.sheetState === 'peek' && !e.target.closest('button, .item, input, a, .sheet-tab')) {
+      snapTo('half');
+    }
+  });
+}
+
+/* =========================================================
+   SEARCH
+   ========================================================= */
+async function searchLocation(query) {
+  if (!query.trim()) return;
+  try {
+    $('mapLoading').classList.add('show');
+    $('mapLoadingText').textContent = 'جارٍ البحث...';
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&accept-language=ar`);
+    const data = await res.json();
+    if (!data.length) {
+      toast('لم يُعثر على الموقع');
+      return;
+    }
+    const { lat, lon, display_name } = data[0];
+    addSearchHistory(query);
+    await loadPlacesAt(+lat, +lon, display_name);
+  } catch (e) {
+    console.error(e);
+    toast('فشل البحث');
+  } finally {
+    $('mapLoading').classList.remove('show');
+  }
+}
+
+function addSearchHistory(q) {
+  const h = APP.state.searchHistory.filter(x => x !== q);
+  h.unshift(q);
+  APP.state.searchHistory = h.slice(0, 6);
+  save('q_history', APP.state.searchHistory);
+  renderSearchHistory();
+}
+
+function renderSearchHistory() {
+  const wrap = $('searchHistory');
+  if (!APP.state.searchHistory.length) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = APP.state.searchHistory.map(q => `
+    <div class="history-item" data-q="${escapeHtml(q)}">
+      <span>🕐</span><span>${escapeHtml(q)}</span>
+      <span class="close" data-rm="${escapeHtml(q)}">✕</span>
+    </div>`).join('');
+  wrap.querySelectorAll('.history-item').forEach(el => {
+    el.addEventListener('click', (e) => {
+      if (e.target.classList.contains('close')) {
+        e.stopPropagation();
+        APP.state.searchHistory = APP.state.searchHistory.filter(x => x !== el.dataset.q);
+        save('q_history', APP.state.searchHistory);
+        renderSearchHistory();
+        return;
+      }
+      searchLocation(el.dataset.q);
+    });
+  });
+}
+
+/* =========================================================
+   LOAD PLACES
+   ========================================================= */
+async function loadPlacesAt(lat, lon, placeName) {
+  APP.state.userPos = { lat, lon };
+  if (APP.map) APP.map.setView([lat, lon], 15, { animate: true });
+  $('searchPlaceholder').textContent = placeName
+    ? placeName.substring(0, 40) + (placeName.length > 40 ? '...' : '')
+    : 'موقعك الحالي';
+  $('mapLoading').classList.add('show');
+  $('mapLoadingText').textContent = 'جارٍ البحث عن الأماكن...';
+
+  try {
+    const places = await fetchNearby(lat, lon, 2000);
+    APP.state.places = places;
+    renderTypeChips();
+    applyFilters();
+    const time = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+    $('lastUpdateText').textContent = `آخر تحديث: ${time}`;
+    $('lastUpdate').classList.add('show');
+  } catch (e) {
+    console.error(e);
+    toast('تعذر تحميل الأماكن، تحقق من الاتصال');
+  } finally {
+    $('mapLoading').classList.remove('show');
+  }
+}
+
+/* =========================================================
+   GEOLOCATION
+   ========================================================= */
+function getUserLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) return reject(new Error('no geolocation'));
+    navigator.geolocation.getCurrentPosition(
+      p => resolve({ lat: p.coords.latitude, lon: p.coords.longitude }),
+      err => reject(err),
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
+    );
+  });
+}
+
+/* =========================================================
+   CHIPS
+   ========================================================= */
+function renderTypeChips() {
+  const counts = {};
+  APP.state.places.forEach(p => { counts[p.type] = (counts[p.type] || 0) + 1; });
+  const types = ['all', ...Object.keys(counts).sort((a, b) => counts[b] - counts[a])].slice(0, 14);
+  $('typeChips').innerHTML = types.map(t => {
+    if (t === 'all') {
+      return `<button class="chip ${APP.state.currentType === 'all' ? 'active' : ''}" data-type="all">🌟 الكل (${APP.state.places.length})</button>`;
+    }
+    const info = getTypeInfo(t);
+    return `<button class="chip ${APP.state.currentType === t ? 'active' : ''}" data-type="${t}">${info.emoji} ${info.label} (${counts[t]})</button>`;
+  }).join('');
+  $('typeChips').querySelectorAll('.chip').forEach(c => {
+    c.addEventListener('click', () => {
+      APP.state.currentType = c.dataset.type;
+      renderTypeChips();
+      applyFilters();
+    });
+  });
+}
+
+/* =========================================================
+   UI INIT
+   ========================================================= */
+function initUI() {
+  // sheet tabs
+  document.querySelectorAll('.sheet-tab').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('.sheet-tab').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      APP.state.currentTab = t.dataset.tab;
+      $('tabContentAll').classList.toggle('hidden', t.dataset.tab !== 'all');
+      $('tabContentFav').classList.toggle('hidden', t.dataset.tab !== 'fav');
+      $('tabContentVisited').classList.toggle('hidden', t.dataset.tab !== 'visited');
+      $('tabContentChart').classList.toggle('hidden', t.dataset.tab !== 'chart');
+      $('list').classList.toggle('hidden', t.dataset.tab === 'chart');
+      if (t.dataset.tab === 'chart') renderChart();
+      applyFilters();
+      const sheet = $('sheet');
+      if (sheet.classList.contains('peek')) {
+        sheet.classList.remove('peek');
+        sheet.classList.add('half');
+        APP.state.sheetState = 'half';
+      }
+    });
+  });
+
+  // search input (name filter)
+  $('searchInput').addEventListener('input', (e) => {
+    APP.state.searchQuery = e.target.value;
+    applyFilters();
+  });
+  $('btnClearSearch').addEventListener('click', () => {
+    $('searchInput').value = '';
+    APP.state.searchQuery = '';
+    applyFilters();
+  });
+
+  // distance
+  $('distanceSlider').addEventListener('input', (e) => {
+    APP.state.maxDistance = +e.target.value;
+    $('distanceValue').textContent =
+      APP.state.maxDistance >= 10000 ? 'كل المسافات' : fmtDist(APP.state.maxDistance);
+    applyFilters();
+  });
+
+  // search pill opens sheet
+  $('searchPill').addEventListener('click', () => {
+    const sheet = $('sheet');
+    sheet.classList.remove('peek', 'half');
+    sheet.classList.add('full');
+    APP.state.sheetState = 'full';
+    setTimeout(() => $('searchInput').focus(), 300);
+  });
+
+  // city search (Enter)
+  $('searchInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const q = APP.state.searchQuery.trim();
+      if (q.length > 2) searchLocation(q);
+    }
+  });
+
+  // FABs
+  $('btnLocate').addEventListener('click', onLocate);
+  $('btnRefresh').addEventListener('click', onRefresh);
+  $('btnPickLocation').addEventListener('click', () => {
+    APP.state.picking = true;
+    toast('انقر على أي مكان في الخريطة');
+  });
+  $('btnLayer').addEventListener('click', cycleLayer);
+  $('btnQibla').addEventListener('click', openQibla);
+  $('btnMeasure').addEventListener('click', startMeasure);
+  $('qiblaCompass').addEventListener('click', openQibla);
+
+  // bottom nav
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      const nav = b.dataset.nav;
+      document.querySelectorAll('.nav-btn').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      if (nav === 'list') {
+        document.querySelector('[data-tab="all"]').click();
+      } else if (nav === 'nearby') {
+        const open = APP.state.filtered.filter(p => p.hoursOpen === true);
+        const all = APP.state.places.filter(p => p.hoursOpen === true);
+        const target = (open.length ? open : all).sort((a, b) => a.distance - b.distance)[0];
+        if (!target) return toast('لا يوجد مكان مفتوح قريب');
+        focusPlace(target);
+        openDetail(target);
+      } else if (nav === 'locate') {
+        onLocate();
+      } else if (nav === 'fav') {
+        document.querySelector('[data-tab="fav"]').click();
+      } else if (nav === 'more') {
+        openMenu();
+      }
+    });
+  });
+
+  // profile
+  $('btnProfile').addEventListener('click', openProfile);
+}
+
+/* =========================================================
+   LAYER CYCLE
+   ========================================================= */
+function cycleLayer() {
+  if (!APP.map) return;
+  const order = ['dark', 'light', 'satellite'];
+  const cur = APP.state.mapLayer;
+  const next = order[(order.indexOf(cur) + 1) % order.length];
+  APP.map.removeLayer(APP.layers[cur]);
+  APP.layers[next].addTo(APP.map);
+  APP.state.mapLayer = next;
+  localStorage.setItem('q_layer', next);
+  const names = { dark: '🌙 داكن', light: '☀️ فاتح', satellite: '🛰️ قمر صناعي' };
+  toast(names[next]);
+}
+
+/* =========================================================
+   LOCATE / REFRESH
+   ========================================================= */
+async function onLocate() {
+  toast('جارٍ تحديد موقعك...');
+  try {
+    const pos = await getUserLocation();
+    if (APP.map) APP.map.flyTo([pos.lat, pos.lon], 16, { duration: 1 });
+    await loadPlacesAt(pos.lat, pos.lon, 'موقعك الحالي');
+  } catch {
+    toast('تعذر تحديد موقعك');
+  }
+}
+
+async function onRefresh() {
+  const u = APP.state.userPos;
+  if (!u) return toast('موقعك غير محدد');
+  await loadPlacesAt(u.lat, u.lon, null);
+  toast('تم التحديث ✅');
+}
+
+/* =========================================================
+   MAP CLICK (pick / measure)
+   ========================================================= */
+function onMapClick(e) {
+  if (APP.state.picking) {
+    APP.state.picking = false;
+    toast('تم اختيار الموقع 📍');
+    loadPlacesAt(e.latlng.lat, e.latlng.lng, 'موقع مختار');
+    return;
+  }
+  if (APP.state.measuring) {
+    const latlng = e.latlng;
+    APP.measureMarkers.push(latlng);
+    L.circleMarker(latlng, {
+      radius: 6, color: '#fff', weight: 2,
+      fillColor: '#3b82f6', fillOpacity: 1,
+    }).addTo(APP.map);
+    if (APP.measureMarkers.length > 1) {
+      if (APP.measureLine) APP.map.removeLayer(APP.measureLine);
+      APP.measureLine = L.polyline(APP.measureMarkers, {
+        color: '#3b82f6', weight: 3, dashArray: '6,6',
+      }).addTo(APP.map);
+      let d = 0;
+      for (let i = 1; i < APP.measureMarkers.length; i++) {
+        d += haversine(
+          APP.measureMarkers[i-1].lat, APP.measureMarkers[i-1].lng,
+          APP.measureMarkers[i].lat, APP.measureMarkers[i].lng
+        );
+      }
+      toast(`📏 المسافة: ${fmtDist(d)}`, 3000);
+    }
+  }
+}
+
+function startMeasure() {
+  if (!APP.map) return;
+  APP.state.measuring = !APP.state.measuring;
+  $('btnMeasure').classList.toggle('active', APP.state.measuring);
+
+  // clear old markers if any
+  APP.map.eachLayer(l => {
+    if (l._qareebMeasure) APP.map.removeLayer(l);
+  });
+
+  if (!APP.state.measuring) {
+    if (APP.measureLine) { APP.map.removeLayer(APP.measureLine); APP.measureLine = null; }
+    APP.measureMarkers = [];
+    toast('تم إلغاء القياس');
+  } else {
+    APP.measureMarkers = [];
+    toast('📏 انقر على الخريطة لقياس المسافة (نقرة أولى = بداية)');
+  }
+}
+
+/* =========================================================
+   CHART
+   ========================================================= */
+function renderChart() {
+  const list = APP.state.places;
+  if (!list.length) {
+    $('chartContent').innerHTML = '<div class="empty-state"><div class="icon">📊</div><div class="title">لا توجد بيانات</div></div>';
+    return;
+  }
+
+  const byType = {};
+  list.forEach(p => { byType[p.type] = (byType[p.type] || 0) + 1; });
+  const types = Object.entries(byType).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const max = types[0]?.[1] || 1;
+
+  const open = list.filter(p => p.hoursOpen === true).length;
+  const closed = list.filter(p => p.hoursOpen === false).length;
+  const unknown = list.filter(p => p.hoursOpen === null).length;
+
+  $('chartContent').innerHTML = `
+    <div class="stats-bar" style="margin-bottom:16px;">
+      <div class="stat-pill"><div class="num">${list.length}</div><div class="lbl">إجمالي</div></div>
+      <div class="stat-pill open-p"><div class="num">${open}</div><div class="lbl">مفتوح</div></div>
+      <div class="stat-pill closed-p"><div class="num">${closed}</div><div class="lbl">مغلق</div></div>
+      <div class="stat-pill unknown-p"><div class="num">${unknown}</div><div class="lbl">غير معروف</div></div>
+    </div>
+    <div style="font-weight:800;margin-bottom:12px;">📊 الأنواع</div>
+    ${types.map(([t, n]) => {
+      const info = getTypeInfo(t);
+      return `
+        <div style="margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;">
+            <span>${info.emoji} ${info.label}</span>
+            <span style="font-weight:700;">${n}</span>
+          </div>
+          <div style="height:8px;background:var(--bg-surface-2);border-radius:4px;overflow:hidden;">
+            <div style="width:${(n/max*100).toFixed(1)}%;height:100%;background:${info.color};border-radius:4px;"></div>
+          </div>
+        </div>`;
+    }).join('')}
+    <div style="background:var(--bg-surface-2);border-radius:14px;padding:14px;margin-top:16px;">
+      <div style="font-weight:800;margin-bottom:8px;">⭐ نشاطك</div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;"><span>المفضلة</span><span style="font-weight:700;">${APP.state.favorites.length}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;"><span>أماكن زرتها</span><span style="font-weight:700;">${APP.state.visited.length}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;"><span>تقييماتي</span><span style="font-weight:700;">${Object.values(APP.state.reviews).flat().length}</span></div>
+    </div>
+  `;
+}
+
+/* =========================================================
+   MENU + PROFILE
+   ========================================================= */
+function openMenu() {
+  const ov = document.createElement('div');
+  ov.className = 'menu-overlay';
+  document.body.appendChild(ov);
+
+  const sheet = document.createElement('div');
+  sheet.className = 'menu-sheet';
+  const isLight = document.body.classList.contains('light-theme');
+  sheet.innerHTML = `
+    <div class="menu-sheet-handle"></div>
+    <div class="menu-sheet-title">⚙️ المزيد</div>
+    <div class="menu-sheet-sub">إعدادات وخصائص</div>
+
+    <div class="menu-section-title">المظهر</div>
+    <button class="menu-btn" data-menu="theme">
+      <span class="icon">${isLight ? '☀️' : '🌙'}</span>
+      <span class="label">الوضع ${isLight ? 'الفاتح' : 'الداكن'}</span>
+    </button>
+    <button class="menu-btn" data-menu="accent">
+      <span class="icon">🎨</span><span class="label">لون التطبيق</span>
+    </button>
+    <button class="menu-btn" data-menu="layer">
+      <span class="icon">🗺️</span><span class="label">نمط الخريطة</span>
+    </button>
+
+    <div class="menu-section-title">الأدوات</div>
+    <button class="menu-btn" data-menu="qibla">
+      <span class="icon">🕌</span><span class="label">اتجاه القبلة</span>
+    </button>
+    <button class="menu-btn" data-menu="measure">
+      <span class="icon">📏</span><span class="label">قياس المسافة</span>
+    </button>
+    <button class="menu-btn" data-menu="export">
+      <span class="icon">📤</span><span class="label">تصدير البيانات</span>
+    </button>
+
+    <div class="menu-section-title">معلومات</div>
+    <button class="menu-btn" data-menu="about">
+      <span class="icon">ℹ️</span><span class="label">حول التطبيق</span>
+    </button>
+    <button class="menu-btn" data-menu="privacy">
+      <span class="icon">🔒</span><span class="label">الخصوصية</span>
+    </button>
+    <button class="menu-btn" data-menu="clear">
+      <span class="icon">🗑️</span><span class="label" style="color:var(--danger);">مسح كل البيانات</span>
+    </button>
+  `;
+  document.body.appendChild(sheet);
+  requestAnimationFrame(() => {
+    sheet.classList.add('show');
+    ov.classList.add('show');
+  });
+
+  const close = () => {
+    sheet.classList.remove('show');
+    ov.classList.remove('show');
+    setTimeout(() => { sheet.remove(); ov.remove(); }, 300);
+  };
+  ov.addEventListener('click', close);
+  sheet.querySelectorAll('[data-menu]').forEach(b => {
+    b.addEventListener('click', () => {
+      const key = b.dataset.menu;
+      close();
+      setTimeout(() => handleMenu(key), 200);
+    });
+  });
+}
+
+function handleMenu(key) {
+  if (key === 'theme') {
+    document.body.classList.toggle('light-theme');
+    localStorage.setItem('q_theme', document.body.classList.contains('light-theme') ? 'light' : 'dark');
+    toast('تم التغيير');
+  } else if (key === 'accent') {
+    openAccentPicker();
+  } else if (key === 'layer') {
+    cycleLayer();
+  } else if (key === 'qibla') {
+    openQibla();
+  } else if (key === 'measure') {
+    startMeasure();
+  } else if (key === 'export') {
+    exportData();
+  } else if (key === 'about') {
+    toast('قريب v2.0 — بيانات من OpenStreetMap', 3500);
+  } else if (key === 'privacy') {
+    toast('🔒 لا نجمع أي بيانات. كل شيء على جهازك', 3500);
+  } else if (key === 'clear') {
+    if (confirm('حذف كل البيانات والمفضلة والتقييمات؟')) {
+      localStorage.clear();
+      location.reload();
+    }
+  }
+}
+
+function openAccentPicker() {
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay show';
+  const colors = ['blue','green','purple','pink','orange','red','teal','amber'];
+  modal.innerHTML = `
+    <div class="modal">
+      <button class="modal-close" data-close>✕</button>
+      <div class="modal-title">🎨 اختر اللون</div>
+      <div class="modal-sub">لون التطبيق الأساسي</div>
+      <div class="color-picker">
+        ${colors.map(c => `<div class="color-dot ${document.body.dataset.accent === c ? 'active' : ''}" data-color="${c}"></div>`).join('')}
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.querySelectorAll('.color-dot').forEach(d => {
+    d.addEventListener('click', () => {
+      document.body.dataset.accent = d.dataset.color;
+      localStorage.setItem('q_accent', d.dataset.color);
+      modal.querySelectorAll('.color-dot').forEach(x => x.classList.remove('active'));
+      d.classList.add('active');
+    });
+  });
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal || e.target.closest('[data-close]')) modal.remove();
+  });
+}
+
+function openProfile() {
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay show';
+  const totalReviews = Object.values(APP.state.reviews).flat().length;
+  modal.innerHTML = `
+    <div class="modal" style="padding:0; overflow:hidden; max-width:400px;">
+      <button class="modal-close" data-close style="z-index:3; background:rgba(255,255,255,.2); color:#fff;">✕</button>
+      <div class="profile-header">
+        <div class="profile-avatar">👤</div>
+        <div class="profile-name">مستخدم قريب</div>
+        <div class="profile-email">بياناتك محفوظة محليًا</div>
+      </div>
+      <div class="profile-stats">
+        <div class="profile-stat"><div class="num">${APP.state.favorites.length}</div><div class="lbl">مفضلة</div></div>
+        <div class="profile-stat"><div class="num">${APP.state.visited.length}</div><div class="lbl">زرتُ</div></div>
+        <div class="profile-stat"><div class="num">${totalReviews}</div><div class="lbl">تقييماتي</div></div>
+      </div>
+      <div style="padding:16px;">
+        <button class="modal-btn" data-close style="background:var(--bg-surface-2);color:var(--text-primary);">إغلاق</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal || e.target.closest('[data-close]')) modal.remove();
+  });
+}
+
+/* =========================================================
+   EXPORT
+   ========================================================= */
+function exportData() {
+  const data = {
+    app: 'qareeb',
+    version: '2.0',
+    exportedAt: new Date().toISOString(),
+    favorites: APP.state.favorites,
+    visited: APP.state.visited,
+    reviews: APP.state.reviews,
+    searchHistory: APP.state.searchHistory,
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `qareeb-${Date.now()}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast('تم تصدير البيانات 📤');
+}
+
+/* =========================================================
+   NETWORK
+   ========================================================= */
+window.addEventListener('online', () => $('offlineBanner').classList.remove('show'));
+window.addEventListener('offline', () => $('offlineBanner').classList.add('show'));
+if (!navigator.onLine) $('offlineBanner').classList.add('show');
+$('offlineRetry').addEventListener('click', () => location.reload());
+
+/* =========================================================
+   BOOT
+   ========================================================= */
+async function boot() {
+  // load prefs
+  const theme = localStorage.getItem('q_theme');
+  if (theme === 'light') document.body.classList.add('light-theme');
+  const accent = localStorage.getItem('q_accent');
+  if (accent) document.body.dataset.accent = accent;
+
+  updateFavBadge();
+  renderSearchHistory();
+  initSheetDrag();
+  initUI();
+
+  const setStatus = (s) => { const el = $('splashStatus'); if (el) el.textContent = s; };
+
+  try {
+    setStatus('جارٍ تحديد موقعك...');
+    let pos;
+    try {
+      pos = await getUserLocation();
+    } catch (err) {
+      // fallback: الرياض
+      pos = { lat: 24.7136, lon: 46.6753 };
+      toast('استخدمنا موقعًا افتراضيًا (الرياض) — انقر 📍 لموقعك الفعلي', 3500);
+    }
+
+    setStatus('جارٍ تحميل الخريطة...');
+    initMap(pos.lat, pos.lon);
+
+    setStatus('جارٍ البحث عن الأماكن...');
+    await loadPlacesAt(pos.lat, pos.lon, 'موقعك الحالي');
+
+    $('qiblaCompass').classList.add('show');
+
+    setStatus('جاهز!');
+    setTimeout(() => $('splash').classList.add('hide'), 600);
+
+    // privacy notice first run
+    if (!localStorage.getItem('q_privacyOk')) {
+      setTimeout(() => $('privacyNotice').classList.add('show'), 1400);
+    }
+  } catch (e) {
+    console.error(e);
+    setStatus('حدث خطأ');
+    $('splash').classList.add('hide');
+    $('errorOverlay').classList.add('show');
+  }
+}
+
+/* =========================================================
+   ERROR HANDLERS
+   ========================================================= */
+$('privacyAccept').addEventListener('click', () => {
+  localStorage.setItem('q_privacyOk', '1');
+  $('privacyNotice').classList.remove('show');
+});
+
+$('errorRetry').addEventListener('click', () => {
+  $('errorOverlay').classList.remove('show');
+  boot();
+});
+
+$('errorManual').addEventListener('click', () => {
+  $('errorOverlay').classList.remove('show');
+  const pos = { lat: 24.7136, lon: 46.6753 };
+  initMap(pos.lat, pos.lon);
+  loadPlacesAt(pos.lat, pos.lon, 'الرياض');
+  APP.state.picking = true;
+  toast('انقر 🎯 ثم على الخريطة لاختيار موقعك', 3000);
+});
+
+/* =========================================================
+   START
+   ========================================================= */
+document.addEventListener('DOMContentLoaded', boot);
+</script>
+</body>
+</html>
